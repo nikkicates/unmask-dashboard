@@ -3,50 +3,63 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot } from 'firebase/firestore';
-import { AlertTriangle, Layers, Loader2, ChevronRight, Activity, Terminal, ShieldCheck } from 'lucide-react';
+import { 
+  AlertTriangle, Layers, Loader2, ChevronRight, Activity, ShieldCheck, Calendar, Zap
+} from 'lucide-react';
 
 /**
- * UNMASK AI STRATEGIC ENGINE - Build v4.8
- * Final Methodological Troubleshooting Version
+ * UNMASK FRAMEWORK DIAGNOSTIC v5.2
+ * Branding: Strategic Transformations (Blue #064680)
+ * Typography: Lora (Serif) & Urbanist (Sans)
  */
+
+// Safety helper for Netlify Environment Variables
+const getEnv = (key) => {
+  try {
+    if (typeof process !== 'undefined' && process.env && process.env[key]) {
+      return process.env[key].trim();
+    }
+  } catch (e) {}
+  return null;
+};
 
 const App = () => {
   const [loading, setLoading] = useState(true);
   const [auditData, setAuditData] = useState(null);
   const [error, setError] = useState(null);
-  const [showDebug, setShowDebug] = useState(false);
   const [auditId] = useState(new URLSearchParams(window.location.search).get('id'));
 
   useEffect(() => {
     const initEngine = async () => {
       try {
-        // 1. Explicitly grab baked variables from the process
-        const env = process.env || {};
-        
+        // 1. Fetch Configuration from Netlify or Canvas Globals
+        const globalConfig = window.__firebase_config || {};
         const config = {
-          apiKey: (env.REACT_APP_FIREBASE_API_KEY || window.__firebase_config?.apiKey || "").trim(),
-          authDomain: (env.REACT_APP_FIREBASE_AUTH_DOMAIN || window.__firebase_config?.authDomain || "").trim(),
-          projectId: (env.REACT_APP_FIREBASE_PROJECT_ID || window.__firebase_config?.projectId || "unmask-audit-2026").trim(),
-          storageBucket: (env.REACT_APP_FIREBASE_STORAGE_BUCKET || window.__firebase_config?.storageBucket || "").trim(),
-          messagingSenderId: (env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || window.__firebase_config?.messagingSenderId || "").trim(),
-          appId: (env.REACT_APP_FIREBASE_APP_ID || window.__firebase_config?.appId || "").trim()
+          apiKey: getEnv('REACT_APP_FIREBASE_API_KEY') || globalConfig.apiKey,
+          authDomain: getEnv('REACT_APP_FIREBASE_AUTH_DOMAIN') || globalConfig.authDomain,
+          projectId: getEnv('REACT_APP_FIREBASE_PROJECT_ID') || globalConfig.projectId || "unmask-audit-2026",
+          storageBucket: getEnv('REACT_APP_FIREBASE_STORAGE_BUCKET') || globalConfig.storageBucket,
+          messagingSenderId: getEnv('REACT_APP_FIREBASE_MESSAGING_SENDER_ID') || globalConfig.messagingSenderId,
+          appId: getEnv('REACT_APP_FIREBASE_APP_ID') || globalConfig.appId
         };
 
-        // 2. The Hard Stop
         if (!config.apiKey) {
-          throw new Error("BUILD_ID_FAIL: The React compiler did not find REACT_APP_FIREBASE_API_KEY during the build phase.");
+          throw new Error("MISSING_KEYS: The engine is idling. Please ensure your Firebase keys are added to Netlify Environment Variables.");
         }
 
-        // 3. Firebase Lifecycle
+        // 2. Initialize
         const firebaseApp = getApps().length === 0 ? initializeApp(config) : getApps()[0];
         const auth = getAuth(firebaseApp);
         const db = getFirestore(firebaseApp);
 
+        // 3. Auth & Data Stream
         onAuthStateChanged(auth, async (user) => {
-          if (!user) await signInAnonymously(auth);
+          if (!user) {
+            try { await signInAnonymously(auth); } catch (e) { console.error(e); }
+          }
 
           if (auditId) {
-            const effectiveAppId = window.__app_id || 'unmask-audit-2026';
+            const effectiveAppId = typeof __app_id !== 'undefined' ? __app_id : 'unmask-audit-2026';
             const docRef = doc(db, 'artifacts', effectiveAppId, 'public', 'data', 'structural_audits', auditId);
             
             onSnapshot(docRef, (snap) => {
@@ -54,11 +67,11 @@ const App = () => {
                 setAuditData(snap.data());
                 setError(null);
               } else {
-                setError(`ERR_NOT_FOUND: record_${auditId}`);
+                setError(`ID_NOT_FOUND: Record "${auditId}" not found.`);
               }
               setLoading(false);
             }, (err) => {
-              setError(`ERR_DB: ${err.message}`);
+              setError(`DB_SYNC_ERROR: ${err.message}`);
               setLoading(false);
             });
           } else {
@@ -71,45 +84,22 @@ const App = () => {
         setLoading(false);
       }
     };
-
     initEngine();
   }, [auditId]);
 
-  // --- UI COMPONENTS ---
+  // --- VIEWS ---
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#070b14] text-slate-300 flex items-center justify-center p-6 font-sans">
-        <div className="max-w-xl w-full bg-[#0f172a] border border-red-900/30 rounded-[2.5rem] p-12 text-center shadow-2xl">
-          <AlertTriangle className="text-red-500 h-16 w-16 mx-auto mb-8" />
-          <h2 className="text-2xl font-serif text-white italic mb-6">System Initialization Fault</h2>
-          
-          <div className="bg-black/60 p-6 rounded-2xl mb-10 border border-slate-800 text-red-400 font-mono text-xs break-all leading-relaxed">
+      <div className="min-h-screen bg-[#064680] flex items-center justify-center p-10 font-urbanist text-white">
+        <div className="max-w-xl w-full bg-[#04325c] border border-red-400/20 rounded-[2.5rem] p-12 text-center shadow-2xl">
+          <AlertTriangle className="text-red-400 h-12 w-12 mx-auto mb-6" />
+          <h2 className="text-2xl font-lora italic mb-4">System Access Error</h2>
+          <div className="bg-black/20 p-4 rounded-xl mb-8 font-mono text-red-300 text-[10px] break-all border border-red-900/30">
             {error}
           </div>
-
-          <button 
-            onClick={() => setShowDebug(!showDebug)}
-            className="flex items-center gap-2 mx-auto mb-8 text-[10px] font-black uppercase tracking-[0.3em] text-slate-600 hover:text-teal-400 transition-colors"
-          >
-            <Terminal size={14} /> {showDebug ? "Close Diagnostic Panel" : "Open Diagnostic Panel"}
-          </button>
-
-          {showDebug && (
-            <div className="text-left bg-slate-950 p-6 rounded-2xl border border-slate-800 mb-10 font-mono text-[10px] space-y-2">
-              <p className="text-teal-500 border-b border-slate-800 pb-2 mb-4">DEPLOYED_VARIABLES_MAP:</p>
-              <p>API_KEY: {process.env.REACT_APP_FIREBASE_API_KEY ? "CONNECTED (String Length: " + process.env.REACT_APP_FIREBASE_API_KEY.length + ")" : "NULL_OR_EMPTY"}</p>
-              <p>AUTH_DOMAIN: {process.env.REACT_APP_FIREBASE_AUTH_DOMAIN ? "CONNECTED" : "NULL_OR_EMPTY"}</p>
-              <p>PROJECT_ID: {process.env.REACT_APP_FIREBASE_PROJECT_ID ? "CONNECTED" : "NULL_OR_EMPTY"}</p>
-              <p className="mt-6 text-slate-500 italic">Recommendation: If API_KEY is NULL, go to Netlify Deploys and click "Clear cache and deploy site".</p>
-            </div>
-          )}
-
-          <button 
-            className="w-full bg-slate-800 hover:bg-slate-700 text-white py-4 rounded-xl font-bold transition-all"
-            onClick={() => window.location.reload()}
-          >
-            Restart Engine
+          <button onClick={() => window.location.search = ''} className="text-teal-400 font-black uppercase text-[10px] tracking-widest hover:text-white transition-colors">
+            Return to Entrance
           </button>
         </div>
       </div>
@@ -118,115 +108,160 @@ const App = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#070b14] flex flex-col items-center justify-center gap-6">
+      <div className="min-h-screen bg-[#064680] flex flex-col items-center justify-center gap-6">
         <Loader2 className="h-10 w-10 text-teal-400 animate-spin" />
-        <p className="text-slate-600 font-black text-[10px] uppercase tracking-[0.5em] animate-pulse">Establishing Secure Feed</p>
+        <p className="text-white/40 font-urbanist font-black text-[10px] uppercase tracking-[0.5em]">Establishing Secure Stream</p>
       </div>
     );
   }
 
   if (!auditId) {
     return (
-      <div className="min-h-screen bg-[#070b14] flex items-center justify-center p-6 font-sans">
-        <div className="max-w-md w-full bg-[#0f172a] border border-slate-800 rounded-[3rem] p-12 text-center shadow-2xl relative">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 to-blue-600" />
-          <Layers className="text-teal-400 h-16 w-16 mx-auto mb-8" />
-          <h2 className="text-3xl font-serif text-white italic mb-10">Diagnostic Entry</h2>
-          <input 
-            type="text" 
-            placeholder="RECORD ID" 
-            className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-5 text-white text-center mb-6 uppercase tracking-widest font-mono focus:border-teal-500 outline-none transition-all"
-            onKeyDown={(e) => { if (e.key === 'Enter') window.location.search = `?id=${e.target.value}`; }}
-          />
-          <button 
-            className="w-full bg-[#1e40af] hover:bg-[#2563eb] text-white font-black py-5 rounded-2xl shadow-xl transition-all"
-            onClick={(e) => {
-              const input = e.currentTarget.parentElement.querySelector('input');
-              if (input?.value) window.location.search = `?id=${input.value}`;
-            }}
-          >
-            ACCESS ENGINE
-          </button>
+      <div className="min-h-screen bg-[#064680] flex items-center justify-center p-6 font-urbanist">
+        <div className="max-w-md w-full bg-[#04325c] border border-white/10 rounded-[3rem] p-12 text-center shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-400 to-blue-400 group-hover:h-2 transition-all duration-500" />
+          <Layers className="text-teal-400 h-16 w-16 mx-auto mb-10" />
+          <h2 className="text-3xl font-lora text-white italic mb-12 tracking-tight">Diagnostic Entry</h2>
+          <div className="space-y-6">
+            <input 
+              type="text" 
+              placeholder="Record ID" 
+              className="w-full bg-[#064680] border border-white/10 rounded-2xl px-4 py-5 text-white text-center mb-2 uppercase tracking-[0.2em] font-urbanist focus:border-teal-400 outline-none transition-all shadow-inner placeholder:text-white/20"
+              onKeyDown={(e) => { if (e.key === 'Enter') window.location.search = `?id=${e.target.value}`; }}
+            />
+            <button 
+              className="w-full bg-teal-500 hover:bg-teal-400 text-[#064680] font-black py-5 rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 tracking-[0.1em]"
+              onClick={(e) => {
+                const input = e.currentTarget.parentElement.querySelector('input');
+                if (input?.value) window.location.search = `?id=${input.value}`;
+              }}
+            >
+              ACCESS ENGINE <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-200 font-sans p-8 lg:p-20 relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-teal-500/20 via-transparent to-transparent" />
-      
-      <header className="max-w-7xl mx-auto flex justify-between items-center mb-24 border-b border-slate-800 pb-12 relative z-10">
-        <div className="flex items-center gap-6">
-          <Layers className="text-teal-400 h-10 w-10" />
-          <div>
-            <h1 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">
-              UNMASK <span className="text-teal-400 font-light italic text-2xl lowercase">Diagnostic</span>
-            </h1>
-            <p className="text-slate-600 text-[10px] font-black uppercase tracking-[0.5em] mt-3 italic">ID: {auditId}</p>
+    <div className="min-h-screen bg-[#064680] text-white font-urbanist flex flex-col">
+      <header className="border-b border-white/10 bg-[#04325c]/50 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-6 flex flex-wrap items-center justify-between gap-6">
+          <div className="flex items-center gap-6">
+            <div className="h-10 w-10 flex items-center justify-center bg-white rounded-lg shadow-lg">
+               <div className="grid grid-cols-2 gap-1 scale-75">
+                 <div className="w-3 h-3 bg-[#064680] rounded-sm" />
+                 <div className="w-3 h-3 bg-teal-500 rounded-sm" />
+                 <div className="w-3 h-3 bg-purple-600 rounded-sm" />
+                 <div className="w-3 h-3 bg-[#064680] rounded-sm" />
+               </div>
+            </div>
+            <div>
+              <h1 className="text-2xl font-lora font-bold text-white tracking-tighter leading-none uppercase">
+                UNMASK <span className="text-teal-400 italic font-light lowercase text-xl">Framework Diagnostic</span>
+              </h1>
+              <p className="text-[10px] text-white/40 font-black uppercase tracking-[0.4em] mt-2 italic font-urbanist">
+                Strategic Transformations &bull; Ref: {auditId}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="hidden sm:block">
-           <div className="flex items-center gap-3 text-teal-400 font-mono text-[10px] font-bold uppercase tracking-widest bg-slate-900 px-6 py-3 rounded-full border border-slate-800">
-             <div className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-pulse" />
-             Active Stream
-           </div>
+          <div className="hidden md:flex items-center gap-3 px-6 py-2 bg-[#064680] rounded-full border border-white/10">
+            <div className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">Live Secure Stream</span>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-16 relative z-10">
-        <div className="lg:col-span-8 space-y-16">
-          {[
-            { k: "authorityAlignment", l: "Authority Alignment", s: "Power vs. Responsibility gap." },
-            { k: "operationalSqueeze", l: "Operational Squeeze", s: "Output Load vs. Capacity." },
-            { k: "maskingDensity", l: "Masking Density", s: "Energy lost to performance theater." },
-            { k: "escalationDensity", l: "Escalation Density", s: "Friction in decision velocity." }
-          ].map((f) => (
-            <div key={f.k}>
-              <div className="flex justify-between items-end mb-6">
-                <div>
-                  <h3 className="text-white font-bold uppercase tracking-widest text-lg mb-1">{f.l}</h3>
-                  <p className="text-slate-500 text-xs italic font-light font-sans">{f.s}</p>
+      <main className="flex-grow max-w-7xl mx-auto px-6 py-12 lg:py-20 w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-24">
+          <div className="lg:col-span-7 space-y-16">
+            {[
+              { key: "authorityAlignment", label: "Authority Alignment", sub: "Power vs. Responsibility gap." },
+              { key: "operationalSqueeze", label: "Operational Squeeze", sub: "Production Load vs. Structural Capacity." },
+              { key: "maskingDensity", label: "Masking Density", sub: "Energy lost to organizational performance theater." },
+              { key: "escalationDensity", label: "Escalation Density", sub: "Friction in organizational decision paths." }
+            ].map((field) => (
+              <div key={field.key} className="group">
+                <div className="flex justify-between items-end mb-6">
+                  <div>
+                    <h3 className="text-xl font-urbanist font-black uppercase tracking-widest text-white/90 leading-none mb-2">
+                      {field.label}
+                    </h3>
+                    <p className="text-white/40 text-[11px] italic font-light">{field.sub}</p>
+                  </div>
+                  <div className="text-5xl font-urbanist font-black text-teal-400 tracking-tighter">
+                    {(auditData?.[field.key] || 1.0).toFixed(1)}
+                  </div>
                 </div>
-                <span className="text-teal-400 font-mono text-4xl font-black tracking-tighter">
-                  {(auditData?.[f.k] || 1.0).toFixed(1)}
-                </span>
+                <div className="h-3 bg-[#04325c] rounded-full border border-white/5 overflow-hidden p-[2px]">
+                  <div 
+                    className="h-full bg-gradient-to-r from-teal-600 via-teal-400 to-cyan-400 rounded-full transition-all duration-[2000ms] ease-out shadow-[0_0_20px_rgba(45,212,191,0.3)]"
+                    style={{ width: `${((auditData?.[field.key] || 1.0) / 5) * 100}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-2 bg-slate-900 rounded-full border border-slate-800 overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-teal-600 to-cyan-400 transition-all duration-[1500ms]"
-                  style={{ width: `${((auditData?.[f.k] || 1.0) / 5) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        <div className="lg:col-span-4 space-y-8">
-            <div className="bg-[#0f172a] p-12 rounded-[3.5rem] border border-slate-800 text-center shadow-2xl relative overflow-hidden group">
-               <h2 className="text-2xl font-serif italic text-white mb-8 opacity-80 uppercase tracking-widest">Aggregate Strain</h2>
-               <div className="text-[7rem] font-mono text-teal-400 font-black mb-6 tracking-tighter leading-none">
+            ))}
+          </div>
+          
+          <div className="lg:col-span-5 space-y-10">
+            <div className="bg-gradient-to-br from-[#04325c] to-[#064680] p-10 lg:p-14 rounded-[3.5rem] border border-white/10 shadow-2xl relative overflow-hidden group">
+               <div className="absolute top-0 right-0 p-10 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-700">
+                  <Layers size={120} />
+               </div>
+               <h2 className="text-xl font-lora italic text-white/80 mb-10 uppercase tracking-widest relative z-10">Aggregate Strain</h2>
+               <div className="text-8xl lg:text-9xl font-urbanist font-black text-teal-400 tracking-tighter leading-none mb-8 relative z-10 drop-shadow-[0_4px_20px_rgba(45,212,191,0.2)]">
                  {(auditData?.totalStrainScore || 1.0).toFixed(2)}
                </div>
-               <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.5em]">Health Index</p>
-               <Activity className="text-teal-500/20 h-10 w-10 mx-auto mt-12 animate-pulse" />
+               <p className="text-[11px] text-white/40 uppercase font-black tracking-[0.4em] relative z-10">Structural Health Score</p>
+               <div className="h-px w-20 bg-white/10 my-12 relative z-10" />
+               <Activity className="text-teal-500/20 h-10 w-10 mx-auto animate-pulse relative z-10" />
             </div>
 
-            <div className="bg-slate-900/30 p-10 rounded-[2.5rem] border border-slate-800/50 backdrop-blur-sm">
-               <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-6 flex items-center gap-2">
-                 <ShieldCheck size={16} className="text-teal-500" /> System Verdict
+            <div className="bg-[#04325c]/30 backdrop-blur-xl p-10 rounded-[2.5rem] border border-white/5 relative">
+               <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-6 flex items-center gap-3">
+                 <ShieldCheck size={16} className="text-teal-400" /> System Verdict
                </h4>
-               <p className="text-sm text-slate-400 font-light leading-relaxed italic font-serif">
+               <p className="text-xl font-lora italic text-white/70 leading-relaxed">
                  {auditData?.totalStrainScore > 3.5 
-                   ? "Structural integrity is compromised. Leadership load-paths are operating beyond safe thresholds." 
-                   : "Organizational stability is optimal. Friction levels are within acceptable parameters."}
+                   ? "Structural integrity is compromised. Performance is sustained through individual sacrifice rather than architectural efficiency." 
+                   : "The organization demonstrates high structural maturity with low friction in decision velocity."}
                </p>
             </div>
         </div>
+      </div>
       </main>
 
-      <footer className="mt-20 pt-10 border-t border-slate-800 text-center text-slate-900 text-[10px] font-black tracking-[1em] uppercase">
-        © 2026 STRATEGIC TRANSFORMATIONS &bull; UNMASK ENGINE v4.8
+      <section className="bg-white/5 border-t border-white/10 py-24 px-6 text-center">
+        <div className="max-w-3xl mx-auto space-y-12">
+          <div className="space-y-4">
+            <h2 className="text-4xl font-lora italic text-white">Ready to Recalibrate?</h2>
+            <p className="text-white/50 font-urbanist font-light text-lg">
+              Move from managing symptoms to redesigning systems.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+            <a 
+              href="https://strategictransformations.com/book" 
+              target="_blank" 
+              rel="noreferrer"
+              className="bg-white text-[#064680] px-12 py-5 rounded-2xl font-black font-urbanist text-sm uppercase tracking-[0.2em] flex items-center gap-3 transition-all hover:bg-teal-400 hover:scale-105 shadow-2xl group"
+            >
+              <Calendar size={18} className="group-hover:animate-bounce" />
+              Book Discovery <span className="text-xs font-light opacity-60">with Nikki Cates</span>
+            </a>
+            <button 
+              onClick={() => window.print()}
+              className="text-white/30 hover:text-white font-black uppercase tracking-widest text-[10px] transition-all flex items-center gap-2"
+            >
+              <FileText size={14} /> EXPORT AUDIT PDF
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <footer className="py-16 text-center text-white/10 text-[10px] font-black tracking-[1em] uppercase">
+        &copy; 2026 STRATEGIC TRANSFORMATIONS &bull; PROPRIETARY UNMASK ENGINE
       </footer>
     </div>
   );
