@@ -1,151 +1,170 @@
 /* eslint-disable no-undef */
 import React, { useState, useEffect } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot } from 'firebase/firestore';
-import { 
-  Activity, ShieldCheck, AlertTriangle, Layers, Loader2, ChevronRight, Gauge, TrendingDown
-} from 'lucide-react';
+import { AlertTriangle, Layers, Loader2, ChevronRight, Activity, ShieldCheck } from 'lucide-react';
 
 /**
- * UNMASK AI STRUCTURAL AUDIT - Production Build (v4.1)
- * Fixed: ESLint Undefined Variable Errors
+ * UNMASK AI STRUCTURAL AUDIT - Production Build v4.6
+ * Fixed: Configuration detection for Canvas & Netlify environments
  */
 
-// Helper to safely pull config from different environments without crashing the build
+// Global helper to safely pull config from different environments
 const getSafeConfig = () => {
-  // 1. Check for Netlify/Production Environment Variables
-  if (typeof process !== 'undefined' && process.env && process.env.REACT_APP_FIREBASE_CONFIG) {
+  // 1. Check for Canvas environment global __firebase_config
+  if (typeof __firebase_config !== 'undefined' && __firebase_config) {
     try {
+      return typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+    } catch (e) {
+      console.error("Failed to parse __firebase_config");
+    }
+  }
+
+  // 2. Check for Netlify/Production individual environment variables
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      const config = {
+        apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+        authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+        storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.REACT_APP_FIREBASE_APP_ID
+      };
+      if (config.apiKey) return config;
+    }
+  } catch (e) { /* process is not defined */ }
+
+  // 3. Check for Netlify JSON blob fallback
+  try {
+    if (typeof process !== 'undefined' && process.env?.REACT_APP_FIREBASE_CONFIG) {
       return JSON.parse(process.env.REACT_APP_FIREBASE_CONFIG);
-    } catch (e) {
-      console.error("Failed to parse REACT_APP_FIREBASE_CONFIG");
     }
-  }
-  // 2. Check for Preview/Global Variables (prefixed with window to avoid no-undef errors)
-  if (typeof window !== 'undefined' && window.__firebase_config) {
-    try {
-      return JSON.parse(window.__firebase_config);
-    } catch (e) {
-      console.error("Failed to parse window.__firebase_config");
-    }
-  }
-  return {};
+  } catch (e) { /* process is not defined or JSON invalid */ }
+
+  return null;
 };
 
-const firebaseConfig = getSafeConfig();
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-// Safe access for App ID
-const appId = (typeof window !== 'undefined' && window.__app_id) ? window.__app_id : 
-              (typeof process !== 'undefined' && process.env?.REACT_APP_ID) ? process.env.REACT_APP_ID : 
-              'unmask-audit-2026';
-
 const App = () => {
-  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [auditData, setAuditData] = useState(null);
   const [error, setError] = useState(null);
-  const [auditId, setAuditId] = useState(new URLSearchParams(window.location.search).get('id'));
+  const [auditId] = useState(new URLSearchParams(window.location.search).get('id'));
 
   useEffect(() => {
-    const initAuth = async () => {
+    const initEngine = async () => {
       try {
-        // Check for custom token in global window
-        const customToken = typeof window !== 'undefined' ? window.__initial_auth_token : null;
+        // 1. Fetch Config
+        const config = getSafeConfig();
         
-        if (customToken) {
-          await signInWithCustomToken(auth, customToken);
-        } else {
-          await signInAnonymously(auth);
+        if (!config || !config.apiKey) {
+          throw new Error("MISSING_API_KEY: Configuration not found. If in Netlify, add 'REACT_APP_FIREBASE_API_KEY' to your Environment Variables.");
         }
+
+        // 2. Initialize Firebase
+        const firebaseApp = getApps().length === 0 ? initializeApp(config) : getApps()[0];
+        const auth = getAuth(firebaseApp);
+        const db = getFirestore(firebaseApp);
+
+        // 3. Anonymous Authentication (Rule 3)
+        onAuthStateChanged(auth, async (user) => {
+          if (!user) {
+            try {
+              await signInAnonymously(auth);
+            } catch (authErr) {
+              setError(`AUTH_FAILED: ${authErr.message}`);
+              setLoading(false);
+              return;
+            }
+          }
+
+          // 4. Live Data Subscription (Rule 1)
+          if (auditId) {
+            // Priority: Canvas ID > Default ID
+            const effectiveAppId = typeof __app_id !== 'undefined' ? __app_id : 'unmask-audit-2026';
+            const docRef = doc(db, 'artifacts', effectiveAppId, 'public', 'data', 'structural_audits', auditId);
+            
+            // Error callback required for onSnapshot
+            onSnapshot(docRef, (snap) => {
+              if (snap.exists()) {
+                setAuditData(snap.data());
+                setError(null);
+              } else {
+                setError(`ID_NOT_FOUND: The Audit record "${auditId}" does not exist in the database.`);
+              }
+              setLoading(false);
+            }, (dbErr) => {
+              setError(`DB_ERROR: ${dbErr.message}`);
+              setLoading(false);
+            });
+          } else {
+            setLoading(false);
+          }
+        });
+
       } catch (err) {
-        console.error("Auth error:", err);
-        setError("Secure connection failed. Verify your Netlify environment variables.");
+        console.error("Engine failure:", err);
+        setError(err.message);
+        setLoading(false);
       }
     };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
-    return () => unsubscribe();
-  }, []);
 
-  useEffect(() => {
-    if (!user || !auditId) {
-      if (!auditId) setLoading(false);
-      return;
-    }
+    initEngine();
+  }, [auditId]);
 
-    setLoading(true);
-    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'structural_audits', auditId);
-    
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setAuditData(docSnap.data());
-        setError(null);
-      } else {
-        setError("Audit ID not found. Verify your credentials.");
-      }
-      setLoading(false);
-    }, (err) => {
-      console.error("Firestore sync error:", err);
-      setError("Database sync interrupted.");
-      setLoading(false);
-    });
+  // --- UI RENDERING ---
 
-    return () => unsubscribe();
-  }, [user, auditId, appId]);
-
-  const SliderField = ({ label, subtext, value }) => {
-    const val = value || 1.0;
+  if (error) {
     return (
-      <div className="mb-12 group cursor-default font-sans">
-        <div className="flex justify-between items-end mb-4">
-          <div className="space-y-1">
-            <h3 className="text-white text-lg font-bold tracking-wider uppercase flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.6)]" />
-              {label}
-            </h3>
-            <p className="text-slate-500 text-sm italic font-light">{subtext}</p>
+      <div className="min-h-screen bg-[#070b14] flex items-center justify-center p-10 font-sans">
+        <div className="max-w-xl w-full bg-[#0f172a] border border-red-500/30 rounded-[2.5rem] p-10 text-center shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-red-500/50" />
+          <AlertTriangle className="text-red-500 h-16 w-16 mx-auto mb-6" />
+          <h2 className="text-2xl font-serif text-white italic mb-4">System Access Failure</h2>
+          <div className="bg-black/40 p-5 rounded-2xl mb-8 font-mono text-red-400 text-xs break-all leading-relaxed border border-slate-800">
+            {error}
           </div>
-          <div className="text-4xl font-mono text-teal-400 font-black tracking-tighter">
-            {loading ? "..." : val.toFixed(1)}
-          </div>
-        </div>
-        <div className="relative h-2 bg-slate-800 rounded-full border border-slate-700/50">
-          <div 
-            className="absolute top-0 left-0 h-full bg-gradient-to-r from-teal-600 to-cyan-400 transition-all duration-1000 ease-out"
-            style={{ width: `${(val / 5) * 100}%` }}
-          />
-          <div 
-            className="absolute h-4 w-4 bg-white rounded-full top-1/2 -translate-y-1/2 border-2 border-teal-500 transition-all duration-1000 ease-out"
-            style={{ left: `calc(${(val / 5) * 100}% - 8px)` }}
-          />
+          <p className="text-slate-500 text-sm mb-6 font-light">
+            If you are the administrator, verify that your environment variables match the expected keys.
+          </p>
+          <button 
+            className="text-teal-400 font-black uppercase tracking-widest text-xs hover:text-teal-300 transition-colors"
+            onClick={() => window.location.search = ''}
+          >
+            Return to Entrance
+          </button>
         </div>
       </div>
     );
-  };
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#070b14] flex flex-col items-center justify-center gap-6">
+        <Loader2 className="h-12 w-12 text-teal-400 animate-spin" />
+        <p className="text-slate-600 font-black text-[10px] uppercase tracking-[0.6em] animate-pulse">Initializing UNMASK Engine</p>
+      </div>
+    );
+  }
 
   if (!auditId) {
     return (
       <div className="min-h-screen bg-[#070b14] flex items-center justify-center p-6 font-sans">
-        <div className="max-w-md w-full bg-[#0f172a] border border-slate-800 rounded-[2.5rem] p-10 text-center shadow-2xl">
-          <Layers className="text-teal-400 h-16 w-16 mx-auto mb-6" />
-          <h2 className="text-3xl font-serif text-white italic mb-4">Diagnostic Entry</h2>
-          <p className="text-slate-400 text-sm mb-10 leading-relaxed font-light">
-            Enter your <strong>Audit ID</strong> from your Welcome Kit to access the engine.
-          </p>
-          <div className="space-y-4">
+        <div className="max-w-md w-full bg-[#0f172a] border border-slate-800 rounded-[3.5rem] p-14 text-center shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 to-blue-600 group-hover:h-2 transition-all duration-500" />
+          <Layers className="text-teal-400 h-16 w-16 mx-auto mb-10" />
+          <h2 className="text-3xl font-serif text-white italic mb-12 tracking-tight">Diagnostic Entry</h2>
+          <div className="space-y-6">
             <input 
               type="text" 
-              placeholder="e.g. UNMASK-2026-X92" 
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-4 text-white text-center font-mono focus:outline-none focus:border-teal-500 transition-all uppercase tracking-widest"
+              placeholder="Audit Record ID" 
+              className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-5 text-white text-center mb-2 uppercase tracking-[0.2em] font-mono focus:border-teal-500 outline-none transition-all shadow-inner placeholder:text-slate-700"
               onKeyDown={(e) => { if (e.key === 'Enter') window.location.search = `?id=${e.target.value}`; }}
             />
             <button 
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-xl flex items-center justify-center gap-2"
-              onClick={(e) => { 
+              className="w-full bg-[#1e40af] hover:bg-[#2563eb] text-white font-black py-5 rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 tracking-[0.1em]"
+              onClick={(e) => {
                 const input = e.currentTarget.parentElement.querySelector('input');
                 if (input?.value) window.location.search = `?id=${input.value}`;
               }}
@@ -158,88 +177,98 @@ const App = () => {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#070b14] flex flex-col items-center justify-center gap-6">
-        <Loader2 className="h-12 w-12 text-teal-400 animate-spin" />
-        <p className="text-slate-600 font-black text-[10px] uppercase tracking-[0.5em]">Initializing UNMASK Engine</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-200 font-sans selection:bg-teal-500/30">
-      <header className="border-b border-slate-800/60 bg-[#0d1425]/40 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-5 flex flex-wrap items-center justify-between gap-8">
-          <div className="flex items-center gap-5">
-            <Layers className="text-teal-400 h-8 w-8" />
-            <div>
-              <h1 className="text-2xl font-black tracking-tighter text-white uppercase leading-none">
-                UNMASK <span className="text-teal-400 font-light italic">Diagnostic Engine</span>
-              </h1>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em] mt-1.5">
-                Strategic Transformations &bull; 2026
-              </p>
-            </div>
+    <div className="min-h-screen bg-[#070b14] text-slate-200 font-sans p-8 lg:p-20 relative overflow-hidden">
+      {/* Background Ambience */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-teal-900/10 blur-[120px] rounded-full" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[30%] bg-blue-900/10 blur-[120px] rounded-full" />
+
+      <header className="max-w-7xl mx-auto flex justify-between items-end mb-24 border-b border-slate-800 pb-12 relative z-10">
+        <div className="flex items-center gap-8">
+          <div className="bg-slate-900 border border-slate-800 p-4 rounded-[1.5rem] shadow-xl">
+            <Layers className="text-teal-400 h-10 w-10" />
           </div>
-          <div className="hidden sm:block text-right">
-             <p className="text-[9px] text-slate-500 font-black uppercase mb-1">Audit Record</p>
-             <p className="text-xs font-mono text-teal-400">{auditId}</p>
+          <div>
+            <h1 className="text-5xl font-black text-white uppercase tracking-tighter leading-none">
+              UNMASK <span className="text-teal-400 font-light italic text-3xl lowercase">Diagnostic</span>
+            </h1>
+            <p className="text-slate-600 text-[10px] font-black uppercase tracking-[0.5em] mt-5 italic">Record_Ref: {auditId}</p>
+          </div>
+        </div>
+        <div className="text-right hidden sm:block">
+          <div className="bg-slate-900/50 px-8 py-4 rounded-2xl border border-slate-800/50 backdrop-blur-sm">
+             <div className="flex items-center gap-3 text-teal-400 font-mono text-[11px] font-bold uppercase tracking-widest">
+               <div className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-pulse" />
+               Live Data Feed
+             </div>
           </div>
         </div>
       </header>
 
-      {error ? (
-        <main className="max-w-xl mx-auto mt-20 p-10 bg-red-950/20 border border-red-500/20 rounded-[2.5rem] text-center">
-          <AlertTriangle className="text-red-500 h-12 w-12 mx-auto mb-4" />
-          <h2 className="text-2xl font-serif italic text-white mb-4">System Access Denied</h2>
-          <p className="text-slate-400 mb-6 font-sans">{error}</p>
-          <button className="text-teal-400 underline font-bold font-sans" onClick={() => window.location.search = ''}>Try Again</button>
-        </main>
-      ) : (
-        <main className="max-w-7xl mx-auto p-6 lg:p-12 grid grid-cols-1 lg:grid-cols-12 gap-10">
-          <div className="lg:col-span-4 space-y-6">
-            <div className="bg-[#0f172a] border border-slate-800 rounded-[2rem] p-8 shadow-2xl">
-              <h2 className="text-3xl font-serif text-teal-50 italic mb-6 border-b border-slate-800 pb-4">Executive Briefing</h2>
-              <div className="space-y-8">
-                <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800">
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Load-Path Analysis</span>
-                    <Gauge className="text-teal-400 h-4 w-4" />
-                  </div>
-                  <div className="text-4xl font-mono text-white font-black mb-2">{auditData?.loadPathEfficiency || 0}%</div>
-                  <p className="text-xs text-slate-400 leading-relaxed font-light italic">Measures structural integrity of decision flow.</p>
+      <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-16 relative z-10">
+        <div className="lg:col-span-8 space-y-20">
+          {[
+            { key: "authorityAlignment", label: "Authority Alignment", sub: "Power vs. Responsibility gap." },
+            { key: "operationalSqueeze", label: "Operational Squeeze", sub: "Production Load vs. Structural Capacity." },
+            { key: "maskingDensity", label: "Masking Density", sub: "Energy spent on performance theater." },
+            { key: "escalationDensity", label: "Escalation Density", sub: "Friction in organizational decision paths." }
+          ].map((field) => (
+            <div key={field.key} className="group">
+              <div className="flex justify-between items-end mb-8">
+                <div>
+                  <h3 className="text-white font-bold uppercase tracking-[0.2em] text-xl mb-2">{field.label}</h3>
+                  <p className="text-slate-500 text-sm italic font-light font-sans tracking-wide">{field.sub}</p>
                 </div>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 p-4 bg-slate-800/20 rounded-xl">
-                    <TrendingDown className="text-red-400" size={18} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-300">Risk Profile: <strong className="text-white ml-2">{auditData?.totalStrainScore > 3.5 ? 'Critical' : 'Stable'}</strong></span>
-                  </div>
+                <div className="text-right">
+                  <span className="text-teal-400 font-mono text-5xl font-black tracking-tighter leading-none">
+                    {(auditData?.[field.key] || 1.0).toFixed(1)}
+                  </span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-8 bg-[#0f172a]/50 border border-slate-800/80 rounded-[2.5rem] p-8 lg:p-14 shadow-2xl">
-            <div className="flex flex-col md:flex-row justify-between mb-16 gap-4 border-b border-slate-800 pb-8">
-              <h2 className="text-5xl font-serif text-white italic tracking-tighter">Structural Health Audit</h2>
-              <div className="text-right">
-                <p className="text-[10px] text-slate-500 font-black uppercase mb-1 tracking-widest">Strain Score</p>
-                <p className="text-5xl font-mono text-teal-400 font-black tracking-tighter">{(auditData?.totalStrainScore || 1.0).toFixed(2)}</p>
+              <div className="h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 shadow-inner p-[1px]">
+                <div 
+                  className="h-full bg-gradient-to-r from-teal-700 via-teal-400 to-cyan-400 shadow-[0_0_25px_rgba(45,212,191,0.4)] transition-all duration-[2000ms] ease-out rounded-full"
+                  style={{ width: `${((auditData?.[field.key] || 1.0) / 5) * 100}%` }}
+                />
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16">
-              <SliderField label="1. Authority Alignment" subtext="Responsibility vs Power gap." value={auditData?.authorityAlignment} />
-              <SliderField label="2. Operational Squeeze" subtext="Output Load vs Capacity." value={auditData?.operationalSqueeze} />
-              <SliderField label="3. Masking Density" subtext="Energy lost to performance theater." value={auditData?.maskingDensity} />
-              <SliderField label="4. Escalation Density" subtext="Friction in decision-velocity." value={auditData?.escalationDensity} />
+          ))}
+        </div>
+        
+        <div className="lg:col-span-4 space-y-10">
+            <div className="bg-gradient-to-br from-[#0f172a] to-[#070b14] p-14 rounded-[3.5rem] border border-slate-800 text-center shadow-2xl h-fit relative overflow-hidden group">
+               <div className="absolute top-0 left-0 w-full h-1 bg-teal-500/30 group-hover:h-full transition-all duration-700 opacity-10 pointer-events-none" />
+               
+               <h2 className="text-2xl font-serif italic text-white mb-8 relative z-10 uppercase tracking-widest opacity-80">Aggregate Strain</h2>
+               <div className="text-[7rem] font-mono text-teal-400 font-black mb-6 tracking-tighter relative z-10 leading-none drop-shadow-[0_0_15px_rgba(45,212,191,0.3)]">
+                 {(auditData?.totalStrainScore || 1.0).toFixed(2)}
+               </div>
+               <p className="text-[11px] text-slate-500 uppercase font-black tracking-[0.4em] relative z-10">Structural Health Score</p>
+               
+               <div className="h-px w-20 bg-slate-800 mx-auto my-12 relative z-10" />
+               
+               <Activity className="text-teal-500/20 h-12 w-12 mx-auto animate-pulse relative z-10" />
             </div>
-          </div>
-        </main>
-      )}
 
-      <footer className="max-w-7xl mx-auto p-16 text-center text-slate-800 text-[11px] font-black tracking-[0.6em] uppercase">
-        &copy; 2026 STRATEGIC TRANSFORMATIONS &bull; UNMASK ENGINE v4.1
+            <div className="bg-slate-900/30 p-10 rounded-[2.5rem] border border-slate-800/50 backdrop-blur-md relative overflow-hidden">
+               <div className="absolute top-4 right-6 text-teal-500 opacity-20">
+                 <ShieldCheck size={40} />
+               </div>
+               <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-6 flex items-center gap-3">
+                 System Verdict
+               </h4>
+               <p className="text-base text-slate-400 font-light leading-relaxed font-serif italic">
+                 {auditData?.totalStrainScore > 3.5 
+                   ? "Structural integrity is compromised. Performance is currently being sustained through individual sacrifice rather than architectural efficiency." 
+                   : "The organization demonstrates high structural maturity with low friction in decision velocity."}
+               </p>
+            </div>
+        </div>
+      </main>
+
+      <footer className="max-w-7xl mx-auto p-24 text-center text-slate-900 text-[10px] font-black tracking-[1em] uppercase flex flex-col items-center gap-8 relative z-10">
+        <div className="h-px w-24 bg-slate-900" />
+        &copy; 2026 STRATEGIC TRANSFORMATIONS &bull; PROPRIETARY UNMASK ENGINE
       </footer>
     </div>
   );
