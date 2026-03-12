@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
@@ -7,26 +8,26 @@ import {
 } from 'lucide-react';
 
 /**
- * UNMASK AI STRUCTURAL AUDIT - Production Build
- * Optimized for Environment Compatibility (Canvas & Netlify)
+ * UNMASK AI STRUCTURAL AUDIT - Production Build (v4.1)
+ * Fixed: ESLint Undefined Variable Errors
  */
 
-// Helper to safely get config without ReferenceErrors
+// Helper to safely pull config from different environments without crashing the build
 const getSafeConfig = () => {
-  // Check for Canvas environment globals first
-  if (typeof __firebase_config !== 'undefined') {
-    try {
-      return JSON.parse(__firebase_config);
-    } catch (e) {
-      console.error("Failed to parse __firebase_config");
-    }
-  }
-  // Fallback for Netlify/Create React App environments
+  // 1. Check for Netlify/Production Environment Variables
   if (typeof process !== 'undefined' && process.env && process.env.REACT_APP_FIREBASE_CONFIG) {
     try {
       return JSON.parse(process.env.REACT_APP_FIREBASE_CONFIG);
     } catch (e) {
       console.error("Failed to parse REACT_APP_FIREBASE_CONFIG");
+    }
+  }
+  // 2. Check for Preview/Global Variables (prefixed with window to avoid no-undef errors)
+  if (typeof window !== 'undefined' && window.__firebase_config) {
+    try {
+      return JSON.parse(window.__firebase_config);
+    } catch (e) {
+      console.error("Failed to parse window.__firebase_config");
     }
   }
   return {};
@@ -38,9 +39,9 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // Safe access for App ID
-const appId = (typeof __app_id !== 'undefined' ? __app_id : 
+const appId = (typeof window !== 'undefined' && window.__app_id) ? window.__app_id : 
               (typeof process !== 'undefined' && process.env?.REACT_APP_ID) ? process.env.REACT_APP_ID : 
-              'unmask-audit-2026');
+              'unmask-audit-2026';
 
 const App = () => {
   const [user, setUser] = useState(null);
@@ -52,15 +53,17 @@ const App = () => {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        // Handle initial custom token if provided by environment, otherwise anonymous
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
+        // Check for custom token in global window
+        const customToken = typeof window !== 'undefined' ? window.__initial_auth_token : null;
+        
+        if (customToken) {
+          await signInWithCustomToken(auth, customToken);
         } else {
           await signInAnonymously(auth);
         }
       } catch (err) {
         console.error("Auth error:", err);
-        setError("Secure connection failed. Check your environment configuration.");
+        setError("Secure connection failed. Verify your Netlify environment variables.");
       }
     };
     initAuth();
@@ -69,23 +72,20 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    // RULE 3: Auth Before Queries
     if (!user || !auditId) {
       if (!auditId) setLoading(false);
       return;
     }
 
     setLoading(true);
-    // RULE 1: Strict Paths
     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'structural_audits', auditId);
     
-    // ERROR CALLBACK REQUIRED: Every onSnapshot() call must have error callback
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         setAuditData(docSnap.data());
         setError(null);
       } else {
-        setError("Audit ID not found. Verify your Welcome Kit credentials.");
+        setError("Audit ID not found. Verify your credentials.");
       }
       setLoading(false);
     }, (err) => {
@@ -119,7 +119,7 @@ const App = () => {
             style={{ width: `${(val / 5) * 100}%` }}
           />
           <div 
-            className="absolute h-4 w-4 bg-white rounded-full top-1/2 -translate-y-1/2 border-2 border-teal-500 shadow-[0_0_15px_rgba(255,255,255,0.4)] transition-all duration-1000 ease-out"
+            className="absolute h-4 w-4 bg-white rounded-full top-1/2 -translate-y-1/2 border-2 border-teal-500 transition-all duration-1000 ease-out"
             style={{ left: `calc(${(val / 5) * 100}% - 8px)` }}
           />
         </div>
@@ -133,7 +133,7 @@ const App = () => {
         <div className="max-w-md w-full bg-[#0f172a] border border-slate-800 rounded-[2.5rem] p-10 text-center shadow-2xl">
           <Layers className="text-teal-400 h-16 w-16 mx-auto mb-6" />
           <h2 className="text-3xl font-serif text-white italic mb-4">Diagnostic Entry</h2>
-          <p className="text-slate-400 text-sm mb-10 leading-relaxed font-light font-sans">
+          <p className="text-slate-400 text-sm mb-10 leading-relaxed font-light">
             Enter your <strong>Audit ID</strong> from your Welcome Kit to access the engine.
           </p>
           <div className="space-y-4">
@@ -239,7 +239,7 @@ const App = () => {
       )}
 
       <footer className="max-w-7xl mx-auto p-16 text-center text-slate-800 text-[11px] font-black tracking-[0.6em] uppercase">
-        &copy; 2026 STRATEGIC TRANSFORMATIONS &bull; UNMASK ENGINE v4.0
+        &copy; 2026 STRATEGIC TRANSFORMATIONS &bull; UNMASK ENGINE v4.1
       </footer>
     </div>
   );
