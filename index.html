@@ -27,19 +27,19 @@
         .hex { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
         .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
         
-        /* Interactive Slider Styling */
+        /* Custom Slider Styling */
         input[type=range] { -webkit-appearance: none; background: transparent; width: 100%; cursor: pointer; }
         input[type=range]::-webkit-slider-runnable-track { height: 10px; border-radius: 99px; background: rgba(0,0,0,0.5); }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: #2dd4bf; margin-top: -5px; box-shadow: 0 0 10px rgba(45, 212, 191, 0.5); border: 2px solid white; }
         
-        @media print { .no-print { display: none !important; } }
+        @media print { .no-print { display: none !important; } .glass { background: white !important; color: black !important; border: 1px solid #ddd !important; } }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        // --- 1. CONFIGURATION ---
+        // --- 1. FIREBASE CONFIGURATION ---
         const firebaseConfig = {
             apiKey: "AIzaSyBG4228evDP211fvJv1LMSt0AZ8a8kj31c", 
             authDomain: "unmask-audit-2026.firebaseapp.com",
@@ -55,6 +55,7 @@
 
         const { useState, useEffect } = React;
 
+        // --- UI COMPONENTS ---
         const BrandLogo = ({ size = "md" }) => {
             const containerClass = size === "lg" ? "scale-[1.6] mb-24" : "scale-75";
             const hexSize = "w-6 h-6";
@@ -94,12 +95,14 @@
                         if (auditId) {
                             const cleanId = auditId.trim().toUpperCase();
                             
+                            // 🚀 LOGIC BRANCH: FREE SANDBOX
                             if (cleanId === 'UNMASK2026') {
                                 setIsInteractiveMode(true);
                                 setLoading(false);
                                 return;
                             }
 
+                            // 🚀 LOGIC BRANCH: PAID CERTIFIED SYNC
                             setIsInteractiveMode(false);
                             const path = `artifacts/unmask-audit-2026/public/data/structural_audits/${cleanId}`;
                             
@@ -184,12 +187,12 @@
                         <div className="lg:col-span-4 glass rounded-[3rem] p-10 shadow-2xl h-fit">
                             <h2 className="text-4xl font-lora italic text-white/90 mb-10 border-b border-white/5 pb-8 tracking-tighter">The Briefing</h2>
                             <div className="space-y-12">
-                                <div className="bg-black/20 p-8 rounded-[2.5rem] border border-white/5 shadow-inner">
+                                <div className="bg-black/20 p-8 rounded-[2.5rem] border border-white/5 shadow-inner text-center">
                                     <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Integrity Score</span>
                                     <div className="text-7xl font-black text-white tracking-tighter mb-4 leading-none">
                                         {auditData?.loadPathEfficiency || 68}%
                                     </div>
-                                    <p className="text-xs text-white/40 leading-relaxed italic font-lora font-light">Structural integrity based on organizational load-paths.</p>
+                                    <p className="text-xs text-white/40 leading-relaxed italic font-lora font-light max-w-[200px] mx-auto">Structural integrity based on organizational load-paths.</p>
                                 </div>
                                 <div className="bg-teal-500/5 p-8 rounded-3xl border border-teal-500/10 text-center">
                                     <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest mb-4">Diagnostic Verdict</p>
@@ -221,14 +224,14 @@
                                         <div className="flex justify-between items-end mb-6">
                                             <div>
                                                 <h3 className="text-xl font-black uppercase tracking-widest text-white/90 leading-none mb-3">{f.l}</h3>
-                                                <p className="text-[11px] font-lora italic text-white/30">{f.sub || f.s}</p>
+                                                <p className="text-[11px] font-lora italic text-white/30">{f.s}</p>
                                             </div>
                                             <div className="text-5xl font-black text-teal-400 tracking-tighter leading-none">
-                                                {(auditData?.[f.key || f.k] || 1.0).toFixed(1)}
+                                                {(auditData?.[f.k] || 1.0).toFixed(1)}
                                             </div>
                                         </div>
                                         {isInteractiveMode ? (
-                                            <input type="range" min="1" max="5" step="0.1" value={auditData?.[f.k] || 1} onChange={(e) => updateField(f.k, e.target.value)} />
+                                            <input type="range" min="1" max="5" step="0.1" value={auditData?.[f.k] || 1} onChange={(e) => updateField(f.k, e.target.value)} className="w-full accent-teal-400" />
                                         ) : (
                                             <div className="h-3.5 bg-black/40 rounded-full border border-white/5 p-[3px] overflow-hidden shadow-inner">
                                                 <div className="h-full bg-gradient-to-r from-teal-600 via-teal-400 to-cyan-400 rounded-full transition-all duration-[2000ms]" style={{ width: `${((auditData?.[f.k] || 1) / 5) * 100}%` }} />
@@ -240,33 +243,31 @@
                         </div>
                     </main>
                     
-                    {/* FOOTER CTA SECTION */}
+                    {/* FOOTER CTAs */}
                     {isInteractiveMode ? (
-                        /* SANDBOX FOOTER: Upsell to Paid Audit */
-                        <footer className="bg-slate-900/50 border-t border-white/5 py-16 px-6 text-center no-print">
+                        /* 🚀 SANDBOX FOOTER (FREEBIE) - Upsell to Stan Store */
+                        <footer className="bg-slate-900/50 border-t border-white/5 py-16 px-6 text-center no-print mt-auto">
                             <h3 className="text-3xl font-lora italic text-white mb-4 tracking-tight">Ready to see your team's real numbers?</h3>
                             <p className="text-slate-400 mb-10 max-w-2xl mx-auto text-lg font-light leading-relaxed">
                                 You've experimented with the architecture. Now, initiate a 36-point <span className="text-white font-medium italic underline decoration-teal-500/50 underline-offset-4 tracking-tight">Structural Audit</span> to reveal the cold, hard capacity leaks holding your organization back.
                             </p>
-                            <a href="https://stan.store/nikkicates" target="_blank" rel="noopener noreferrer" className="inline-block bg-[#163d8d] hover:bg-[#1e4eb0] text-white px-12 py-6 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-[0_20px_40px_-10px_rgba(22,61,141,0.5)] active:scale-95">
+                            <a href="https://stan.store/nikkicates" target="_blank" rel="noopener noreferrer" className="inline-block bg-[#163d8d] hover:bg-[#1e4eb0] text-white px-12 py-6 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl active:scale-95">
                                 Unlock the Full Synthesis Engine ($297)
                             </a>
                         </footer>
                     ) : (
-                        /* CERTIFIED FOOTER: Next Step Scheduling */
-                        <footer className="bg-[#0f172a] border-t border-teal-500/20 py-16 px-6 text-center no-print">
+                        /* 💎 CERTIFIED FOOTER (PAID) - Schedule Roadmap Session */
+                        <footer className="bg-[#0f172a] border-t border-teal-500/20 py-16 px-6 text-center no-print mt-auto">
                             <div className="max-w-3xl mx-auto">
                                 <h3 className="text-3xl font-lora italic text-white mb-4 tracking-tight">Recalibrate Your Architecture</h3>
                                 <p className="text-slate-400 mb-10 text-lg font-light leading-relaxed">
-                                    Your data has identified the friction. The next step is a **Recalibration Roadmap** session to dismantle these bottlenecks and reclaim your team's capacity.
+                                    Your data has identified the friction. The next step is a **Recalibration Roadmap** session with Nikki Cates to dismantle these bottlenecks and reclaim your team's capacity.
                                 </p>
                                 <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
                                     <a href="https://calendar.app.google/s18dHSNbE8tBj1eEA" target="_blank" rel="noopener noreferrer" className="bg-white text-[#064680] px-12 py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-teal-400 transition-all shadow-2xl flex items-center gap-3 active:scale-95">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                                         Schedule Roadmap Session
                                     </a>
                                     <button onClick={() => window.print()} className="text-white/30 hover:text-white font-black uppercase tracking-widest text-[10px] transition-all flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 22 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                                         Export System Audit (PDF)
                                     </button>
                                 </div>
