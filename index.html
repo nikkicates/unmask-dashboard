@@ -94,16 +94,12 @@
                         if (auditId) {
                             const cleanId = auditId.trim().toUpperCase();
                             
-                            // 🚀 FREEBIE SANDBOX LOGIC:
-                            // If user types UNMASK2026, we enable sliders and show "Interactive" badge
                             if (cleanId === 'UNMASK2026') {
                                 setIsInteractiveMode(true);
                                 setLoading(false);
                                 return;
                             }
 
-                            // PAID CERTIFIED LOGIC:
-                            // For unique IDs, we pull fixed data from Firestore sync
                             setIsInteractiveMode(false);
                             const path = `artifacts/unmask-audit-2026/public/data/structural_audits/${cleanId}`;
                             
@@ -244,8 +240,9 @@
                         </div>
                     </main>
                     
-                    {/* FOOTER CTA: Points to Stan Store, only visible in Sandbox mode */}
-                    {isInteractiveMode && (
+                    {/* FOOTER CTA SECTION */}
+                    {isInteractiveMode ? (
+                        /* SANDBOX FOOTER: Upsell to Paid Audit */
                         <footer className="bg-slate-900/50 border-t border-white/5 py-16 px-6 text-center no-print">
                             <h3 className="text-3xl font-lora italic text-white mb-4 tracking-tight">Ready to see your team's real numbers?</h3>
                             <p className="text-slate-400 mb-10 max-w-2xl mx-auto text-lg font-light leading-relaxed">
@@ -254,6 +251,26 @@
                             <a href="https://stan.store/nikkicates" target="_blank" rel="noopener noreferrer" className="inline-block bg-[#163d8d] hover:bg-[#1e4eb0] text-white px-12 py-6 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-[0_20px_40px_-10px_rgba(22,61,141,0.5)] active:scale-95">
                                 Unlock the Full Synthesis Engine ($297)
                             </a>
+                        </footer>
+                    ) : (
+                        /* CERTIFIED FOOTER: Next Step Scheduling */
+                        <footer className="bg-[#0f172a] border-t border-teal-500/20 py-16 px-6 text-center no-print">
+                            <div className="max-w-3xl mx-auto">
+                                <h3 className="text-3xl font-lora italic text-white mb-4 tracking-tight">Recalibrate Your Architecture</h3>
+                                <p className="text-slate-400 mb-10 text-lg font-light leading-relaxed">
+                                    Your data has identified the friction. The next step is a **Recalibration Roadmap** session to dismantle these bottlenecks and reclaim your team's capacity.
+                                </p>
+                                <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                                    <a href="https://strategictransformations.com/book" target="_blank" rel="noopener noreferrer" className="bg-white text-[#064680] px-12 py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-teal-400 transition-all shadow-2xl flex items-center gap-3 active:scale-95">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                        Schedule Roadmap Session
+                                    </a>
+                                    <button onClick={() => window.print()} className="text-white/30 hover:text-white font-black uppercase tracking-widest text-[10px] transition-all flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 22 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                                        Export System Audit (PDF)
+                                    </button>
+                                </div>
+                            </div>
                         </footer>
                     )}
                 </div>
