@@ -1,267 +1,251 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Strategic Transformations | Portal</title>
-    
-    <!-- Premium Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Urbanist:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
-    
-    <!-- Styling CDNs -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Firebase Compat SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { getFirestore, doc, onSnapshot } from 'firebase/firestore';
+import { 
+  Activity, ShieldCheck, AlertTriangle, MousePointer2, 
+  TrendingDown, Gauge, Layers, Loader2, ChevronRight 
+} from 'lucide-react';
 
-    <style>
-        body { background-color: #070e24; font-family: 'Urbanist', sans-serif; margin: 0; overflow-x: hidden; color: white; }
-        .font-lora { font-family: 'Lora', serif; }
-        .hex { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
-        .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
+// --- CONFIGURATION ---
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'unmask-audit-2026';
+
+const App = () => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [auditData, setAuditData] = useState({
+    authorityAlignment: 2.5,
+    operationalSqueeze: 3.0,
+    maskingDensity: 4.2,
+    escalationDensity: 3.8,
+    totalStrainScore: 3.3,
+    loadPathEfficiency: 68
+  });
+  const [error, setError] = useState(null);
+  const [isInteractiveMode, setIsInteractiveMode] = useState(false);
+  const [auditId, setAuditId] = useState(new URLSearchParams(window.location.search).get('id'));
+
+  // 1. Authentication Lifecycle
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        setError("Connection failed. Please refresh.");
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Data Lifecycle (Firestore Sync)
+  useEffect(() => {
+    if (!user || !auditId) {
+      if (!auditId) setLoading(false);
+      return;
+    }
+
+    const cleanId = auditId.trim().toUpperCase();
+    
+    // NIKKI: If it's the free code, we go interactive and skip the database sync
+    if (cleanId === 'UNMASK2026') {
+      setIsInteractiveMode(true);
+      setLoading(false);
+      return;
+    }
+
+    // For all other (Paid/Private) IDs, we listen to Firestore
+    setIsInteractiveMode(false);
+    setLoading(true);
+    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'structural_audits', cleanId);
+    
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setAuditData(docSnap.data());
+        setError(null);
+      } else {
+        setError(`Audit ID "${cleanId}" not found. Please check your Welcome Kit.`);
+      }
+      setLoading(false);
+    }, (err) => {
+      setError("Database sync error.");
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user, auditId, appId]);
+
+  const updateField = (key, val) => {
+    if (!isInteractiveMode) return;
+    const numericVal = parseFloat(val);
+    const newData = { ...auditData, [key]: numericVal };
+    // Recalculate total for the interactive demo
+    newData.totalStrainScore = (newData.authorityAlignment + newData.operationalSqueeze + newData.maskingDensity + newData.escalationDensity) / 4;
+    setAuditData(newData);
+  };
+
+  const SliderField = ({ label, subtext, fieldKey }) => {
+    const val = auditData?.[fieldKey] || 1.0;
+    return (
+      <div className="mb-12 group cursor-default font-sans">
+        <div className="flex justify-between items-end mb-4">
+          <div className="space-y-1">
+            <h3 className="text-white text-lg font-bold tracking-wider uppercase flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.6)]" />
+              {label}
+            </h3>
+            <p className="text-slate-500 text-sm italic font-light">{subtext}</p>
+          </div>
+          <div className="text-4xl font-mono text-teal-400 font-black tracking-tighter">
+            {val.toFixed(1)}
+          </div>
+        </div>
         
-        /* Interactive Slider Styling */
-        input[type=range] { -webkit-appearance: none; background: transparent; width: 100%; cursor: pointer; }
-        input[type=range]::-webkit-slider-runnable-track { height: 10px; border-radius: 99px; background: rgba(0,0,0,0.5); }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: #2dd4bf; margin-top: -5px; box-shadow: 0 0 10px rgba(45, 212, 191, 0.5); border: 2px solid white; }
-        
-        @media print { .no-print { display: none !important; } }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
+        {isInteractiveMode ? (
+          <input 
+            type="range" min="1" max="5" step="0.1" 
+            value={val} 
+            onChange={(e) => updateField(fieldKey, e.target.value)}
+            className="w-full h-2 bg-slate-800 rounded-full appearance-none cursor-pointer accent-teal-400"
+          />
+        ) : (
+          <div className="relative h-2 bg-slate-800 rounded-full border border-slate-700/50">
+            <div 
+              className="absolute top-0 left-0 h-full bg-gradient-to-r from-teal-600 to-cyan-400 shadow-[0_0_20px_rgba(45,212,191,0.4)] transition-all duration-700 ease-out"
+              style={{ width: `${(val / 5) * 100}%` }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
 
-    <script type="text/babel">
-        // --- 1. CONFIGURATION ---
-        // NIKKI: Ensure your keys from Firebase match these exactly!
-        const firebaseConfig = {
-            apiKey: "AIzaSyBG4228evDP211fvJv1LMSt0AZ8a8kj31c", 
-            authDomain: "unmask-audit-2026.firebaseapp.com",
-            projectId: "unmask-audit-2026",
-            storageBucket: "unmask-audit-2026.firebasestorage.app",
-            messagingSenderId: "94518937589",
-            appId: "1:94518937589:web:a484d36bf7a11ffe9a82bc"
-        };
+  if (!auditId) {
+    return (
+      <div className="min-h-screen bg-[#070b14] flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-[#0f172a] border border-slate-800 rounded-[2.5rem] p-10 text-center shadow-2xl">
+          <Layers className="text-teal-400 h-16 w-16 mx-auto mb-6" />
+          <h2 className="text-3xl font-serif text-white italic mb-4">Diagnostic Entry</h2>
+          <p className="text-slate-400 text-sm mb-10 leading-relaxed font-light">
+            Enter your <strong>Access Key</strong> to initiate the Synthesis Engine.
+          </p>
+          <div className="space-y-4">
+            <input 
+              type="text" 
+              placeholder="e.g. UNMASK2026" 
+              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-4 text-white text-center focus:outline-none focus:border-teal-500 transition-all uppercase tracking-[0.3em]"
+              onKeyDown={(e) => { if (e.key === 'Enter') window.location.search = `?id=${e.target.value.trim().toUpperCase()}`; }}
+            />
+            <button 
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-xl flex items-center justify-center gap-2"
+              onClick={(e) => { 
+                const val = e.currentTarget.previousSibling.value;
+                if (val) window.location.search = `?id=${val.trim().toUpperCase()}`;
+              }}
+            >
+              AUTHENTICATE SESSION <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#070b14] flex flex-col items-center justify-center gap-4">
+        <Loader2 className="h-10 w-10 text-teal-400 animate-spin" />
+        <p className="text-slate-500 font-mono text-[10px] uppercase tracking-widest animate-pulse">Syncing Structural Data...</p>
+      </div>
+    );
+  }
 
-        const { useState, useEffect } = React;
+  return (
+    <div className="min-h-screen bg-[#070b14] text-slate-200 font-sans selection:bg-teal-500/30">
+      <header className="border-b border-slate-800/60 bg-[#0d1425]/40 backdrop-blur-xl sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-5">
+            <div className="bg-slate-900 border border-slate-700 p-2 rounded-lg shadow-lg">
+              <Layers className="text-teal-400 h-8 w-8" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black tracking-tighter text-white uppercase leading-none">
+                UNMASK <span className="text-teal-400 font-light italic">Diagnostic</span>
+              </h1>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em] mt-1.5">
+                {isInteractiveMode ? 'FREE PUBLIC VIEW' : 'CERTIFIED AUDIT SYNC'} &bull; {auditId}
+              </p>
+            </div>
+          </div>
+          {isInteractiveMode && (
+             <div className="bg-orange-500/10 border border-orange-500/30 px-4 py-2 rounded-full flex items-center gap-2">
+               <MousePointer2 size={14} className="text-orange-400" />
+               <span className="text-[10px] font-black uppercase text-orange-400 tracking-widest">Interactive Mode</span>
+             </div>
+          )}
+        </div>
+      </header>
 
-        // --- COMPONENTS ---
-
-        const BrandLogo = ({ size = "md" }) => {
-            const containerClass = size === "lg" ? "scale-[1.6] mb-24" : "scale-75";
-            const hexSize = "w-6 h-6";
-            return (
-                <div className={`relative flex items-center justify-center ${containerClass}`}>
-                    <div className="relative w-12 h-12">
-                        <div className={`${hexSize} bg-teal-400 hex absolute top-0 left-1/2 -translate-x-1/2 z-20 shadow-[0_0_15px_rgba(45,212,191,0.5)]`} />
-                        <div className={`${hexSize} bg-purple-600 hex absolute top-4 left-0 z-10`} />
-                        <div className={`${hexSize} bg-slate-400 hex absolute top-4 right-0 flex items-center justify-center p-[2px] z-10`}>
-                            <div className="w-full h-full bg-[#070e24] hex" />
-                        </div>
-                    </div>
+      {error ? (
+        <main className="max-w-xl mx-auto mt-20 p-8 bg-red-900/10 border border-red-500/30 rounded-3xl text-center">
+          <AlertTriangle className="text-red-500 h-12 w-12 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-white mb-2">Access Alert</h2>
+          <p className="text-red-200/60 mb-6">{error}</p>
+          <button className="text-teal-400 font-bold underline" onClick={() => window.location.search = ''}>Try different ID</button>
+        </main>
+      ) : (
+        <main className="max-w-7xl mx-auto p-6 lg:p-12 grid grid-cols-1 lg:grid-cols-12 gap-10">
+          <div className="lg:col-span-4">
+            <div className="bg-[#0f172a] border border-slate-800 rounded-[2rem] p-8 shadow-2xl h-fit">
+              <h2 className="text-3xl font-serif text-teal-50 italic mb-6 border-b border-slate-800 pb-4">Briefing</h2>
+              <div className="space-y-8">
+                <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 text-center">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Load-Path Efficiency</span>
+                  <div className="text-6xl font-mono text-white font-black mb-2 leading-none">
+                    {auditData?.loadPathEfficiency || 0}%
+                  </div>
                 </div>
-            );
-        };
-
-        const App = () => {
-            const [loading, setLoading] = useState(true);
-            const [auditData, setAuditData] = useState({
-                authorityAlignment: 2.5,
-                operationalSqueeze: 3.0,
-                maskingDensity: 4.0,
-                escalationDensity: 3.5,
-                totalStrainScore: 3.25,
-                loadPathEfficiency: 68
-            });
-            const [error, setError] = useState(null);
-            const [inputValue, setInputValue] = useState('');
-            const [isInteractiveMode, setIsInteractiveMode] = useState(false);
-            const [auditId, setAuditId] = useState(new URLSearchParams(window.location.search).get('id'));
-
-            useEffect(() => {
-                const init = async () => {
-                    auth.onAuthStateChanged(async (user) => {
-                        if (!user) await auth.signInAnonymously().catch(console.error);
-                        
-                        if (auditId) {
-                            const cleanId = auditId.trim().toUpperCase();
-                            
-                            // 🚀 THE SANDBOX LOGIC:
-                            // If the code is your freebie key, we enable sliders and skip database fetching
-                            if (cleanId === 'UNMASK2026') {
-                                setIsInteractiveMode(true);
-                                setLoading(false);
-                                return;
-                            }
-
-                            // THE CERTIFIED LOGIC:
-                            // For all other IDs, we pull static data from your Airtable sync
-                            setIsInteractiveMode(false);
-                            const path = `artifacts/unmask-audit-2026/public/data/structural_audits/${cleanId}`;
-                            
-                            db.doc(path).onSnapshot((snap) => {
-                                if (snap.exists) {
-                                    setAuditData(snap.data());
-                                    setError(null);
-                                } else {
-                                    setError(`ID_NOT_FOUND: Access code "${cleanId}" not recognized.`);
-                                }
-                                setLoading(false);
-                            }, (err) => { 
-                                setError(`ACCESS_DENIED: Database connection interrupted.`); 
-                                setLoading(false); 
-                            });
-                        } else {
-                            setLoading(false);
-                        }
-                    });
-                };
-                init();
-            }, [auditId]);
-
-            const updateField = (key, val) => {
-                if (!isInteractiveMode) return;
-                const newData = { ...auditData, [key]: parseFloat(val) };
-                newData.totalStrainScore = (newData.authorityAlignment + newData.operationalSqueeze + newData.maskingDensity + newData.escalationDensity) / 4;
-                setAuditData(newData);
-            };
-
-            const handleGo = () => { if (inputValue.trim()) window.location.search = `?id=${inputValue.trim().toUpperCase()}`; };
-
-            if (loading) return (
-                <div className="min-h-screen bg-[#070e24] flex items-center justify-center">
-                    <div className="w-10 h-10 border-2 border-t-teal-500 rounded-full animate-spin" />
+                <div className="bg-teal-500/5 p-6 rounded-2xl border border-teal-500/10 text-center">
+                  <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest mb-3">Diagnostic Verdict</p>
+                  <p className="text-xl font-serif italic text-white/80 leading-snug">
+                    {auditData?.totalStrainScore > 3.5 ? 'Structural Fragmentation: Critical Risk.' : 'Structural Integrity: Stable.'}
+                  </p>
                 </div>
-            );
+              </div>
+            </div>
+          </div>
 
-            if (!auditId || error) return (
-                <div className="min-h-screen bg-[#070e24] flex flex-col items-center justify-center p-8 text-center font-urbanist">
-                    <BrandLogo size="lg" />
-                    <h2 className="text-4xl lg:text-5xl font-lora text-white mb-6 italic tracking-tight font-medium">Secure Diagnostic Access</h2>
-                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.4em] mb-16">Strategic Transformations Portal</p>
-                    <div className="max-w-md w-full space-y-6">
-                        <input 
-                            type="text" 
-                            value={inputValue} 
-                            onChange={(e) => setInputValue(e.target.value)} 
-                            placeholder="......" 
-                            className="w-full bg-slate-900/40 border border-white/5 rounded-2xl px-6 py-8 text-white text-center text-2xl font-mono focus:border-blue-500/40 outline-none transition-all placeholder:text-slate-800" 
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleGo(); }} 
-                        />
-                        {error && <p className="text-red-400 text-[10px] font-bold uppercase tracking-widest">{error}</p>}
-                        <button onClick={handleGo} className="w-full bg-[#163d8d] hover:bg-[#1e4eb0] text-white font-black py-6 rounded-2xl shadow-2xl uppercase tracking-[0.2em] text-sm transition-all active:scale-95">
-                            Authenticate Session
-                        </button>
-                    </div>
-                </div>
-            );
+          <div className="lg:col-span-8 bg-[#0f172a]/50 border border-slate-800/80 rounded-[2.5rem] p-8 lg:p-14 shadow-2xl">
+            <div className="flex flex-col md:flex-row justify-between mb-16 border-b border-slate-800 pb-8">
+              <h2 className="text-6xl font-serif text-white italic tracking-tighter">Structural Health Audit</h2>
+              <div className="text-right">
+                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Aggregate Strain</p>
+                <p className="text-6xl font-mono text-teal-400 font-black tracking-tighter">
+                  {(auditData?.totalStrainScore || 1.00).toFixed(2)}
+                </p>
+              </div>
+            </div>
 
-            return (
-                <div className="min-h-screen bg-[#070e24] text-white flex flex-col font-urbanist selection:bg-teal-500/30">
-                    <header className="border-b border-white/5 bg-[#0f172a]/40 backdrop-blur-xl sticky top-0 z-50 p-6 no-print">
-                        <div className="max-w-7xl mx-auto flex items-center justify-between">
-                            <div className="flex items-center gap-14">
-                                <BrandLogo />
-                                <div>
-                                    <h1 className="text-2xl font-lora font-bold uppercase tracking-tight leading-none">UNMASK <span className="text-teal-400 italic lowercase text-xl font-light">diagnostic</span></h1>
-                                    <p className="text-[9px] text-white/30 font-black uppercase tracking-[0.4em] mt-2 italic">Ref: {auditId}</p>
-                                </div>
-                            </div>
-                            <div className={`flex items-center gap-3 px-4 py-2 rounded-full border ${isInteractiveMode ? 'bg-orange-500/10 border-orange-500/30' : 'bg-teal-500/5 border-teal-500/10'}`}>
-                                <div className={`h-1.5 w-1.5 rounded-full ${isInteractiveMode ? 'bg-orange-400' : 'bg-teal-400 animate-pulse'}`} />
-                                <span className={`text-[9px] font-black uppercase tracking-widest ${isInteractiveMode ? 'text-orange-400' : 'text-teal-400'}`}>
-                                    {isInteractiveMode ? 'Interactive Sandbox' : 'Certified Audit Sync'}
-                                </span>
-                            </div>
-                        </div>
-                    </header>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12">
+              <SliderField label="Authority Alignment" subtext="Power vs Responsibility Gap" fieldKey="authorityAlignment" />
+              <SliderField label="Operational Squeeze" subtext="Output Load vs Capacity" fieldKey="operationalSqueeze" />
+              <SliderField label="Masking Density" subtext="Energy lost to theater" fieldKey="maskingDensity" />
+              <SliderField label="Escalation Density" subtext="Decision path friction" fieldKey="escalationDensity" />
+            </div>
+          </div>
+        </main>
+      )}
+    </div>
+  );
+};
 
-                    <main className="max-w-7xl mx-auto w-full p-6 lg:p-12 grid grid-cols-1 lg:grid-cols-12 gap-12 flex-grow">
-                        <div className="lg:col-span-4 glass rounded-[3rem] p-10 shadow-2xl h-fit">
-                            <h2 className="text-4xl font-lora italic text-white/90 mb-10 border-b border-white/5 pb-8 tracking-tighter">The Briefing</h2>
-                            <div className="space-y-12">
-                                <div className="bg-black/20 p-8 rounded-[2.5rem] border border-white/5 shadow-inner">
-                                    <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Integrity Score</span>
-                                    <div className="text-7xl font-black text-white tracking-tighter mb-4 leading-none">
-                                        {auditData?.loadPathEfficiency || 68}%
-                                    </div>
-                                    <p className="text-xs text-white/40 leading-relaxed italic font-lora font-light">Structural integrity based on organizational load-paths.</p>
-                                </div>
-                                <div className="bg-teal-500/5 p-8 rounded-3xl border border-teal-500/10 text-center">
-                                    <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest mb-4">Diagnostic Verdict</p>
-                                    <p className="text-2xl font-lora italic text-white/80 leading-snug">
-                                        {(auditData?.totalStrainScore || 1) > 3.5 ? 'System Fragmented. Recalibration Required.' : 'Structural Integrity is Stable.'}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="lg:col-span-8 glass rounded-[3.5rem] p-8 lg:p-16 shadow-2xl relative overflow-hidden">
-                            <div className="flex flex-col md:flex-row justify-between mb-24 border-b border-white/5 pb-14">
-                                <h2 className="text-6xl font-lora text-white italic tracking-tighter font-medium">Structural Audit</h2>
-                                <div className="text-center md:text-right">
-                                    <p className="text-[11px] text-white/20 font-black tracking-[0.6em] uppercase mb-2">Aggregate Strain</p>
-                                    <div className="text-8xl font-black text-teal-400 tracking-tighter leading-none">
-                                        {(auditData?.totalStrainScore || 1.0).toFixed(2)}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="space-y-16">
-                                {[
-                                    { k: "authorityAlignment", l: "Authority Alignment", s: "Power vs Responsibility gap." },
-                                    { k: "operationalSqueeze", l: "Operational Squeeze", s: "Output load vs capacity." },
-                                    { k: "maskingDensity", l: "Masking Density", s: "Energy lost to theater." },
-                                    { k: "escalationDensity", l: "Escalation Density", s: "Decision path friction." }
-                                ].map((f) => (
-                                    <div key={f.k}>
-                                        <div className="flex justify-between items-end mb-6">
-                                            <div>
-                                                <h3 className="text-xl font-black uppercase tracking-widest text-white/90 leading-none mb-3">{f.l}</h3>
-                                                <p className="text-[11px] font-lora italic text-white/30">{f.s}</p>
-                                            </div>
-                                            <div className="text-5xl font-black text-teal-400 tracking-tighter leading-none">
-                                                {(auditData?.[f.k] || 1.0).toFixed(1)}
-                                            </div>
-                                        </div>
-                                        {isInteractiveMode ? (
-                                            <input type="range" min="1" max="5" step="0.1" value={auditData?.[f.k] || 1} onChange={(e) => updateField(f.k, e.target.value)} />
-                                        ) : (
-                                            <div className="h-3.5 bg-black/40 rounded-full border border-white/5 p-[3px] overflow-hidden shadow-inner">
-                                                <div className="h-full bg-gradient-to-r from-teal-600 via-teal-400 to-cyan-400 rounded-full transition-all duration-[2000ms]" style={{ width: `${((auditData?.[f.k] || 1) / 5) * 100}%` }} />
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </main>
-                    
-                    {/* FOOTER CTA: Only shows when users are in the free Sandbox mode */}
-                    {isInteractiveMode && (
-                        <footer className="bg-slate-900/50 border-t border-white/5 py-12 px-6 text-center no-print">
-                            <h3 className="text-2xl font-lora italic text-white mb-4">Ready to see your real numbers?</h3>
-                            <p className="text-slate-400 mb-8 max-w-xl mx-auto">You've played with the sliders. Now, initiate a 36-point Structural Audit to reveal the actual capacity leaks inside your leadership team.</p>
-                            <a href="https://stan.store/nikkicates" className="inline-block bg-[#163d8d] hover:bg-[#1e4eb0] text-white px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl active:scale-95">
-                                Unlock the Full Synthesis Engine ($297)
-                            </a>
-                        </footer>
-                    )}
-                </div>
-            );
-        };
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+export default App;v
