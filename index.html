@@ -5,15 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Strategic Transformations | Portal</title>
     
+    <!-- Premium Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Urbanist:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
     
+    <!-- Styling CDNs -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
+    <!-- Firebase Compat SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -24,15 +27,20 @@
         .hex { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
         .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
         
+        /* Interactive Slider Styling */
         input[type=range] { -webkit-appearance: none; background: transparent; width: 100%; cursor: pointer; }
         input[type=range]::-webkit-slider-runnable-track { height: 10px; border-radius: 99px; background: rgba(0,0,0,0.5); }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: #2dd4bf; margin-top: -5px; box-shadow: 0 0 10px rgba(45, 212, 191, 0.5); border: 2px solid white; }
+        
+        @media print { .no-print { display: none !important; } }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
+        // --- 1. CONFIGURATION ---
+        // NIKKI: Ensure your keys from Firebase match these exactly!
         const firebaseConfig = {
             apiKey: "AIzaSyBG4228evDP211fvJv1LMSt0AZ8a8kj31c", 
             authDomain: "unmask-audit-2026.firebaseapp.com",
@@ -47,6 +55,8 @@
         const db = firebase.firestore();
 
         const { useState, useEffect } = React;
+
+        // --- COMPONENTS ---
 
         const BrandLogo = ({ size = "md" }) => {
             const containerClass = size === "lg" ? "scale-[1.6] mb-24" : "scale-75";
@@ -67,7 +77,12 @@
         const App = () => {
             const [loading, setLoading] = useState(true);
             const [auditData, setAuditData] = useState({
-                authorityAlignment: 1, operationalSqueeze: 1, maskingDensity: 1, escalationDensity: 1, totalStrainScore: 1, loadPathEfficiency: 100
+                authorityAlignment: 2.5,
+                operationalSqueeze: 3.0,
+                maskingDensity: 4.0,
+                escalationDensity: 3.5,
+                totalStrainScore: 3.25,
+                loadPathEfficiency: 68
             });
             const [error, setError] = useState(null);
             const [inputValue, setInputValue] = useState('');
@@ -80,16 +95,19 @@
                         if (!user) await auth.signInAnonymously().catch(console.error);
                         
                         if (auditId) {
-                            // CLEANUP: Trim spaces and force Uppercase to match Airtable standard
                             const cleanId = auditId.trim().toUpperCase();
                             
-                            if (cleanId === 'SANDBOX') {
+                            // 🚀 THE SANDBOX LOGIC:
+                            // If the code is your freebie key, we enable sliders and skip database fetching
+                            if (cleanId === 'UNMASK2026') {
                                 setIsInteractiveMode(true);
                                 setLoading(false);
                                 return;
                             }
 
-                            // PATH CHECK: Matches the Make.com "Folder Structure"
+                            // THE CERTIFIED LOGIC:
+                            // For all other IDs, we pull static data from your Airtable sync
+                            setIsInteractiveMode(false);
                             const path = `artifacts/unmask-audit-2026/public/data/structural_audits/${cleanId}`;
                             
                             db.doc(path).onSnapshot((snap) => {
@@ -97,11 +115,11 @@
                                     setAuditData(snap.data());
                                     setError(null);
                                 } else {
-                                    setError(`ID_NOT_FOUND: Could not find "${cleanId}" in the audits collection.`);
+                                    setError(`ID_NOT_FOUND: Access code "${cleanId}" not recognized.`);
                                 }
                                 setLoading(false);
                             }, (err) => { 
-                                setError(`ACCESS_DENIED: Check your Firebase Security Rules.`); 
+                                setError(`ACCESS_DENIED: Database connection interrupted.`); 
                                 setLoading(false); 
                             });
                         } else {
@@ -134,8 +152,10 @@
                     <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.4em] mb-16">Strategic Transformations Portal</p>
                     <div className="max-w-md w-full space-y-6">
                         <input 
-                            type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} 
-                            placeholder="Enter Audit ID..." 
+                            type="text" 
+                            value={inputValue} 
+                            onChange={(e) => setInputValue(e.target.value)} 
+                            placeholder="......" 
                             className="w-full bg-slate-900/40 border border-white/5 rounded-2xl px-6 py-8 text-white text-center text-2xl font-mono focus:border-blue-500/40 outline-none transition-all placeholder:text-slate-800" 
                             onKeyDown={(e) => { if (e.key === 'Enter') handleGo(); }} 
                         />
@@ -174,7 +194,7 @@
                                 <div className="bg-black/20 p-8 rounded-[2.5rem] border border-white/5 shadow-inner">
                                     <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Integrity Score</span>
                                     <div className="text-7xl font-black text-white tracking-tighter mb-4 leading-none">
-                                        {auditData?.loadPathEfficiency || 88}%
+                                        {auditData?.loadPathEfficiency || 68}%
                                     </div>
                                     <p className="text-xs text-white/40 leading-relaxed italic font-lora font-light">Structural integrity based on organizational load-paths.</p>
                                 </div>
@@ -226,6 +246,17 @@
                             </div>
                         </div>
                     </main>
+                    
+                    {/* FOOTER CTA: Only shows when users are in the free Sandbox mode */}
+                    {isInteractiveMode && (
+                        <footer className="bg-slate-900/50 border-t border-white/5 py-12 px-6 text-center no-print">
+                            <h3 className="text-2xl font-lora italic text-white mb-4">Ready to see your real numbers?</h3>
+                            <p className="text-slate-400 mb-8 max-w-xl mx-auto">You've played with the sliders. Now, initiate a 36-point Structural Audit to reveal the actual capacity leaks inside your leadership team.</p>
+                            <a href="https://your-stan-store-link.com" className="inline-block bg-[#163d8d] hover:bg-[#1e4eb0] text-white px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl active:scale-95">
+                                Unlock the Full Synthesis Engine ($297)
+                            </a>
+                        </footer>
+                    )}
                 </div>
             );
         };
